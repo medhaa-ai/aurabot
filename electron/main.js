@@ -15,7 +15,10 @@ const windowStatePath = path.join(os.homedir(), '.aurabot', 'window_state.json')
 function loadWindowState() {
   try {
     if (fs.existsSync(windowStatePath)) {
-      return JSON.parse(fs.readFileSync(windowStatePath, 'utf8'));
+      const state = JSON.parse(fs.readFileSync(windowStatePath, 'utf8'));
+      // Never restore a compact-mode height — always open fully expanded
+      if (!state.height || state.height < 500) state.height = 620;
+      return state;
     }
   } catch (_) {}
   return { width: 380, height: 620 };
@@ -25,6 +28,8 @@ function saveWindowState() {
   if (!mainWindow || mainWindow.isDestroyed()) return;
   try {
     const bounds = mainWindow.getBounds();
+    // Save the expanded height even if currently collapsed
+    if (isCompact) bounds.height = expandedHeight;
     fs.writeFileSync(windowStatePath, JSON.stringify(bounds));
   } catch (_) {}
 }
