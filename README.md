@@ -19,6 +19,33 @@ pip install -r requirements.txt
 npm start
 ```
 
+## Quick start (macOS)
+
+**Prerequisites:** [Node.js 20+](https://nodejs.org) and [Python 3.11+](https://www.python.org/downloads/) (or `brew install node@20 python@3.11`).
+
+One command does everything — installs Node deps, creates a Python venv, installs all packages, and sets up the WhatsApp bridge:
+
+```bash
+git clone https://github.com/medhaa-ai/aurabot.git
+cd aurabot
+chmod +x bootstrap_mac.sh && ./bootstrap_mac.sh
+```
+
+Then launch:
+
+```bash
+npm start
+```
+
+To build a native `.dmg` installer:
+
+```bash
+python scripts/make_icons.py   # generates icon.icns (requires Pillow: pip install pillow)
+npm run package:mac
+```
+
+The app opens as **AuraBot** in your Dock and menu bar.
+
 ## Tech stack
 
 | Layer | Technology |
