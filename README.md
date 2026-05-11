@@ -21,15 +21,16 @@ npm start
 
 ## Quick start (macOS)
 
-**Prerequisites:** [Node.js 20+](https://nodejs.org) and [Python 3.11+](https://www.python.org/downloads/) (or `brew install node@20 python@3.11`).
+No manual installs needed — the bootstrap script handles **Homebrew, Node.js, Python, and all packages** automatically.
 
-One command does everything — installs Node deps, creates a Python venv, installs all packages, and sets up the WhatsApp bridge:
+Open **Terminal** and paste these two lines:
 
 ```bash
 git clone https://github.com/medhaa-ai/aurabot.git
-cd aurabot
-chmod +x bootstrap_mac.sh && ./bootstrap_mac.sh
+cd aurabot && chmod +x bootstrap_mac.sh && ./bootstrap_mac.sh
 ```
+
+> First run takes ~5 minutes while Python packages download. You'll be prompted for your password once (for Homebrew).
 
 Then launch:
 
@@ -37,14 +38,17 @@ Then launch:
 npm start
 ```
 
-To build a native `.dmg` installer:
+AuraBot opens as a floating window. You'll be prompted for your [Anthropic API key](https://console.anthropic.com) on first launch — it's free to get started.
+
+### Build a native .dmg (optional)
+
+If you want AuraBot as a proper double-clickable `.app` in your Applications folder:
 
 ```bash
-python scripts/make_icons.py   # generates icon.icns (requires Pillow: pip install pillow)
 npm run package:mac
 ```
 
-The app opens as **AuraBot** in your Dock and menu bar.
+This creates `dist/AuraBot-1.0.0.dmg`. Open it, drag **AuraBot** to Applications, and it'll appear in your Dock like any other app.
 
 ## Tech stack
 
