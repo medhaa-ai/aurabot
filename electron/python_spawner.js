@@ -84,8 +84,9 @@ async function spawnPythonBackend() {
 
   pythonProcess = spawn(python, [script], {
     stdio: ['ignore', logFd, logFd],
-    env:   { ...process.env, PYTHONPATH: projectRoot },
-    detached: false,
+    env:         { ...process.env, PYTHONPATH: projectRoot },
+    detached:    false,
+    windowsHide: true,
   });
 
   pythonProcess.on('error', err => {
