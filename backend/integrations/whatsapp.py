@@ -22,7 +22,17 @@ log = logging.getLogger(__name__)
 
 BRIDGE_PORT = 8766
 BRIDGE_URL  = f"http://127.0.0.1:{BRIDGE_PORT}"
-BRIDGE_DIR  = Path(__file__).resolve().parent.parent.parent / "whatsapp_bridge"
+
+def _find_bridge_dir() -> Path:
+    # In packaged app (electron-builder extraResources), bridge lands at
+    # resources/whatsapp_bridge — one level above resources/app/
+    app_dir = Path(__file__).resolve().parent.parent.parent
+    pkg_path = app_dir.parent / "whatsapp_bridge"
+    if pkg_path.exists():
+        return pkg_path
+    return app_dir / "whatsapp_bridge"  # dev layout
+
+BRIDGE_DIR = _find_bridge_dir()
 
 _bridge_proc: "subprocess.Popen | None" = None
 

@@ -57,6 +57,14 @@ function getBackendScript() {
   return path.join(__dirname, '..', 'backend', 'main.py');
 }
 
+function getBridgeDir() {
+  if (app.isPackaged) {
+    // electron-builder puts whatsapp_bridge in resources/ via extraResources
+    return path.join(process.resourcesPath, 'whatsapp_bridge');
+  }
+  return path.join(__dirname, '..', 'whatsapp_bridge');
+}
+
 
 // ── Helpers ────────────────────────────────────────────────────────────────
 
@@ -82,6 +90,22 @@ function savedHash() {
 }
 
 
+// ── Helpers ────────────────────────────────────────────────────────────────
+
+async function _ensureBridge(notify) {
+  const bridgeDir     = getBridgeDir();
+  const bridgeModules = path.join(bridgeDir, 'node_modules');
+  if (fs.existsSync(bridgeDir) && !fs.existsSync(bridgeModules)) {
+    notify('Installing WhatsApp bridge dependencies…');
+    try {
+      await run('npm', ['install', '--prefix', bridgeDir, '--silent'], notify);
+    } catch (e) {
+      console.warn('[setup] WhatsApp bridge install failed (non-fatal):', e.message);
+    }
+  }
+}
+
+
 // ── Public API ─────────────────────────────────────────────────────────────
 
 /**
@@ -100,6 +124,8 @@ async function checkAndSetup(onProgress) {
 
   if (alreadySetUp) {
     notify('Python environment ready.');
+    // Still check bridge even when Python env is cached
+    await _ensureBridge(notify);
     return;
   }
 
@@ -130,9 +156,12 @@ async function checkAndSetup(onProgress) {
     throw new Error(`Package installation failed: ${e.message}`);
   }
 
+  // ── WhatsApp bridge npm install ──────────────────────────────────────────
+  await _ensureBridge(notify);
+
   // ── Save hash so we skip setup next time ─────────────────────────────────
   fs.writeFileSync(HASH_FILE, currentHash, 'utf8');
   notify('Setup complete!');
 }
 
-module.exports = { checkAndSetup, getVenvPython, getBackendScript };
+module.exports = { checkAndSetup, getVenvPython, getBackendScript, getBridgeDir };
