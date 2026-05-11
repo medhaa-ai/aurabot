@@ -40,15 +40,27 @@ npm start
 
 AuraBot opens as a floating window. You'll be prompted for your [Anthropic API key](https://console.anthropic.com) on first launch — it's free to get started.
 
-### Build a native .dmg (optional)
+### Install as a proper macOS app (optional)
 
-If you want AuraBot as a proper double-clickable `.app` in your Applications folder:
+If you want AuraBot to live in your Applications folder and launch from the Dock like any other app, follow these steps — all done in **Terminal** inside the `aurabot` folder:
 
+**Step 1** — still in Terminal, run:
 ```bash
 npm run package:mac
 ```
+This takes ~2 minutes and creates a file at `dist/AuraBot-1.0.0.dmg` inside the aurabot folder.
 
-This creates `dist/AuraBot-1.0.0.dmg`. Open it, drag **AuraBot** to Applications, and it'll appear in your Dock like any other app.
+**Step 2** — open the `.dmg`:
+```bash
+open dist/AuraBot-1.0.0.dmg
+```
+A Finder window pops up showing the AuraBot icon and an Applications shortcut.
+
+**Step 3** — drag the **AuraBot** icon into the **Applications** folder shown in that window.
+
+**Step 4** — eject the disk image (drag it to Trash or press Cmd+E), then open **Launchpad** or **Applications** and double-click **AuraBot**. It'll appear in your Dock from now on.
+
+> You only need to do this once. After that, launch AuraBot directly from the Dock — no Terminal needed.
 
 ## Tech stack
 
