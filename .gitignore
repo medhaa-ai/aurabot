@@ -1,0 +1,50 @@
+# Python
+venv/
+.venv/
+__pycache__/
+*.py[cod]
+*.pyo
+*.egg-info/
+*.egg
+
+# Node
+node_modules/
+whatsapp_bridge/node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Electron build output
+dist/
+out/
+backend-dist/
+
+# AuraBot runtime data (machine-specific, never commit)
+.aurabot/
+~/.aurabot/
+
+# Dev log artifacts
+run_out.txt
+run_err.txt
+electron_out.txt
+electron_err.txt
+*.log
+
+# IDE
+.vscode/
+.idea/
+*.suo
+*.user
+
+# OS
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Secrets (belt-and-suspenders — keys are encrypted, but still)
+*.key
+*.pem
+*.env
+.env
+google_client_secret.json
+client_secret*.json

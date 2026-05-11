@@ -1,0 +1,280 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>AuraBot</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+<div id="app">
+
+  <!-- ── HEADER (draggable) ──────────────────────────────────────────── -->
+  <header id="header" class="drag-region">
+    <div id="avatar-wrap">
+      <img id="header-avatar" src="avatars/idle.svg" alt="AuraBot" draggable="false">
+      <span id="status-dot" class="status-dot status-loading"></span>
+    </div>
+    <div id="header-info">
+      <span id="bot-name">AuraBot</span>
+      <span id="status-text">Starting…</span>
+    </div>
+    <div id="header-controls" class="no-drag">
+      <button id="btn-tools"    title="Settings" aria-label="Settings">⚙</button>
+      <button id="btn-pin"     title="Always on top" aria-label="Toggle always on top">📌</button>
+      <button id="btn-collapse" title="Collapse" aria-label="Collapse window">▼</button>
+      <button id="btn-close"   title="Close" aria-label="Close">✕</button>
+    </div>
+  </header>
+
+  <!-- ── LOADING SCREEN ─────────────────────────────────────────────── -->
+  <div id="loading-screen" class="screen active">
+    <img src="avatars/thinking.svg" class="loading-avatar" alt="">
+    <p class="loading-title">Starting AuraBot…</p>
+    <div class="typing-dots"><span></span><span></span><span></span></div>
+    <p class="loading-sub">Waking up your AI companion</p>
+  </div>
+
+  <!-- ── ERROR SCREEN ───────────────────────────────────────────────── -->
+  <div id="error-screen" class="screen">
+    <img src="avatars/confused.svg" class="loading-avatar" alt="">
+    <p class="error-title">Couldn't start backend</p>
+    <p id="error-message" class="error-msg"></p>
+    <button id="btn-retry" class="btn-primary">Retry</button>
+  </div>
+
+  <!-- ── MAIN CONTENT ───────────────────────────────────────────────── -->
+  <div id="main-content" class="screen">
+
+    <!-- Message list -->
+    <div id="messages" role="log" aria-live="polite" aria-label="Chat messages"></div>
+
+    <!-- Nudges panel -->
+    <div id="nudges-panel">
+      <button id="nudges-toggle" class="nudges-header" aria-expanded="false">
+        <span class="nudge-icon">🔔</span>
+        <span class="nudge-label">Nudges</span>
+        <span id="nudge-count" class="nudge-badge" hidden>0</span>
+        <span class="nudge-chevron">▲</span>
+      </button>
+      <div id="nudges-list" class="nudges-list collapsed"></div>
+    </div>
+
+    <!-- Input area -->
+    <div id="input-area">
+      <button id="btn-attach" title="Attach file" aria-label="Attach file" class="icon-btn">📎</button>
+      <textarea
+        id="user-input"
+        placeholder="Message AuraBot…"
+        rows="1"
+        aria-label="Message input"
+        autocomplete="off"
+        spellcheck="true"
+      ></textarea>
+      <button id="btn-send" title="Send (Enter)" aria-label="Send message" class="icon-btn send-btn">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+          <line x1="22" y1="2" x2="11" y2="13"/>
+          <polygon points="22 2 15 22 11 13 2 9 22 2"/>
+        </svg>
+      </button>
+    </div>
+
+  </div><!-- /main-content -->
+
+  <!-- ── SETTINGS OVERLAY ───────────────────────────────────────────── -->
+  <div id="settings-overlay" class="overlay" hidden role="dialog" aria-modal="true" aria-label="Settings">
+    <div class="overlay-panel">
+      <div class="overlay-header drag-region">
+        <span class="overlay-title">Settings</span>
+        <button id="settings-close" class="no-drag icon-btn" aria-label="Close settings">✕</button>
+      </div>
+
+      <!-- Tab bar -->
+      <nav class="settings-tabs" role="tablist">
+        <button class="tab-btn active" role="tab" data-tab="api-keys">API Keys</button>
+        <button class="tab-btn" role="tab" data-tab="profile">Profile</button>
+        <button class="tab-btn" role="tab" data-tab="permissions">Permissions</button>
+        <button class="tab-btn" role="tab" data-tab="memory">Memory</button>
+        <button class="tab-btn" role="tab" data-tab="appearance">Appearance</button>
+        <button class="tab-btn" role="tab" data-tab="about">About</button>
+      </nav>
+
+      <!-- Tab panels -->
+      <div class="settings-content">
+
+        <div class="tab-panel active" id="tab-api-keys">
+          <p class="tab-notice">Keys are encrypted on your machine and never leave it.</p>
+          <label class="field-group">
+            <span>Anthropic API Key</span>
+            <input type="password" id="key-anthropic" placeholder="sk-ant-…" autocomplete="off">
+          </label>
+          <label class="field-group">
+            <span>SerpAPI Key</span>
+            <input type="password" id="key-serpapi" placeholder="Your SerpAPI key" autocomplete="off">
+          </label>
+          <label class="field-group">
+            <span>Google Client ID</span>
+            <input type="text" id="key-google-id" placeholder="…apps.googleusercontent.com" autocomplete="off">
+          </label>
+          <label class="field-group">
+            <span>Google Client Secret</span>
+            <input type="password" id="key-google-secret" placeholder="GOCSPX-…" autocomplete="off">
+          </label>
+          <button class="btn-primary" id="btn-save-keys">Save Keys</button>
+
+          <div class="gmail-connect-section">
+            <div class="gmail-connect-header">
+              <span class="gmail-icon">✉</span>
+              <span>Gmail</span>
+              <span id="gmail-status-badge" class="gmail-badge gmail-badge-off">Not connected</span>
+            </div>
+
+            <p class="field-note" id="gmail-setup-note">
+              Requires Google Client ID + Secret above and a Google Cloud project with the Gmail API enabled.<br>
+              Add <code>http://localhost:8765/gmail/callback</code> as an authorised redirect URI.
+            </p>
+            <div class="gmail-btn-row">
+              <button class="btn-primary btn-sm" id="btn-connect-gmail">Connect Gmail</button>
+              <button class="btn-danger btn-sm" id="btn-disconnect-gmail" hidden>Disconnect</button>
+            </div>
+            <p id="gmail-email-label" class="gmail-email-label" hidden></p>
+            <p id="gmail-poll-label"  class="gmail-poll-label"  hidden>Waiting for browser authorisation…</p>
+          </div>
+
+          <div class="gmail-connect-section" style="margin-top:8px">
+            <div class="gmail-connect-header">
+              <span class="gmail-icon">📅</span>
+              <span>Google Calendar</span>
+              <span id="cal-status-badge" class="gmail-badge gmail-badge-off">Not connected</span>
+            </div>
+            <p class="field-note">
+              Uses the same Google credentials above. Connecting re-authorises with both Gmail + Calendar scopes.
+            </p>
+            <div class="gmail-btn-row">
+              <button class="btn-primary btn-sm" id="btn-connect-cal">Connect Calendar</button>
+              <button class="btn-danger btn-sm" id="btn-disconnect-cal" hidden>Disconnect Calendar</button>
+            </div>
+            <p id="cal-poll-label" class="gmail-poll-label" hidden>Waiting for browser authorisation…</p>
+          </div>
+
+          <div class="wa-connect-section">
+            <div class="wa-connect-header">
+              <span class="wa-icon">📱</span>
+              <span>WhatsApp</span>
+              <span id="wa-status-badge" class="wa-badge wa-badge-off">Not running</span>
+            </div>
+            <p class="field-note">
+              No API key needed — uses your phone session. Scan once, session is saved.
+            </p>
+            <div class="wa-btn-row">
+              <button class="btn-primary btn-sm" id="btn-start-wa">Start WhatsApp</button>
+              <button class="btn-danger btn-sm" id="btn-stop-wa" hidden>Stop &amp; Disconnect</button>
+            </div>
+            <p id="wa-name-label"  class="wa-name-label"  hidden></p>
+            <p id="wa-poll-label"  class="wa-poll-label"  hidden>Waiting for QR scan…</p>
+            <div id="wa-qr-wrap"   class="wa-qr-wrap"     hidden>
+              <img id="wa-qr-img"  class="wa-qr-img" src="" alt="WhatsApp QR code">
+              <p class="field-note">Scan with WhatsApp → Linked Devices → Link a Device</p>
+            </div>
+          </div>
+
+          <p class="field-note">No keys yet? AuraBot runs fine — just no AI or integrations until configured.</p>
+        </div>
+
+        <div class="tab-panel" id="tab-profile">
+          <label class="field-group">
+            <span>Your name</span>
+            <input type="text" id="profile-name" placeholder="What should AuraBot call you?">
+          </label>
+          <label class="field-group">
+            <span>Timezone</span>
+            <input type="text" id="profile-tz" placeholder="Asia/Kolkata" value="Asia/Kolkata">
+          </label>
+          <label class="field-group">
+            <span>Working hours</span>
+            <div class="row-inputs">
+              <input type="time" id="work-start" value="09:00">
+              <span>to</span>
+              <input type="time" id="work-end" value="19:00">
+            </div>
+          </label>
+          <label class="field-group">
+            <span>Greeting style</span>
+            <select id="greeting-style">
+              <option value="casual">Casual</option>
+              <option value="formal">Formal</option>
+              <option value="witty">Witty</option>
+            </select>
+          </label>
+          <button class="btn-primary" id="btn-save-profile">Save Profile</button>
+        </div>
+
+        <div class="tab-panel" id="tab-permissions">
+          <p class="tab-notice">Permissions you've granted. Revoke any time.</p>
+          <div id="permissions-list">
+            <p class="empty-state">No permissions granted yet.</p>
+          </div>
+        </div>
+
+        <div class="tab-panel" id="tab-memory">
+          <div class="memory-stats">
+            <div class="stat-card"><span class="stat-num" id="mem-fact-count">—</span><span class="stat-label">Facts stored</span></div>
+            <div class="stat-card"><span class="stat-num" id="mem-last-summary">—</span><span class="stat-label">Last summary</span></div>
+          </div>
+          <div class="field-group">
+            <span>Search &amp; forget</span>
+            <div class="row-inputs">
+              <input type="text" id="mem-search" placeholder="e.g. Lyra, coffee, Priya…">
+              <button class="btn-danger btn-sm" id="btn-mem-search">Find</button>
+            </div>
+          </div>
+          <div id="mem-results"></div>
+          <div class="danger-zone">
+            <button class="btn-danger" id="btn-wipe-memory">Wipe All Memory</button>
+            <button class="btn-secondary" id="btn-export-memory">Export JSON</button>
+          </div>
+        </div>
+
+        <div class="tab-panel" id="tab-appearance">
+          <label class="field-group toggle-row">
+            <span>Dark mode</span>
+            <label class="toggle">
+              <input type="checkbox" id="toggle-dark" checked>
+              <span class="slider"></span>
+            </label>
+          </label>
+          <label class="field-group toggle-row">
+            <span>Always on top</span>
+            <label class="toggle">
+              <input type="checkbox" id="toggle-aot">
+              <span class="slider"></span>
+            </label>
+          </label>
+        </div>
+
+        <div class="tab-panel" id="tab-about">
+          <div class="about-avatar">
+            <img src="avatars/happy.svg" width="100" alt="">
+          </div>
+          <h3>AuraBot</h3>
+          <p class="about-version">v1.0.0 — All 8 phases complete</p>
+          <p class="about-desc">Your always-on AI chief-of-staff. Built with Electron + Python + Claude.</p>
+          <p class="about-desc">Data lives entirely on your machine in <code>~/.aurabot/</code>.</p>
+        </div>
+
+      </div><!-- /settings-content -->
+    </div><!-- /overlay-panel -->
+  </div><!-- /settings-overlay -->
+
+</div><!-- /app -->
+
+<!-- Hidden file input for attachments -->
+<input type="file" id="file-input" hidden accept="image/*,.pdf,.doc,.docx,.txt">
+
+<script src="avatar_controller.js"></script>
+<script src="nudges.js"></script>
+<script src="settings.js"></script>
+<script src="app.js"></script>
+</body>
+</html>

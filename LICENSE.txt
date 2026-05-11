@@ -1,0 +1,5 @@
+AuraBot — Private Use License
+
+Copyright (c) 2026 AuraBot
+
+This software is for personal use only. All rights reserved.

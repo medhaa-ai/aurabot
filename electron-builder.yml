@@ -1,0 +1,49 @@
+appId: com.aurabot.app
+productName: AuraBot
+asar: false
+
+directories:
+  output: dist
+
+files:
+  - electron/**/*
+  - frontend/**/*
+  - backend/**/*
+  - requirements.txt
+  - launch.js
+  - "!**/__pycache__/**"
+  - "!**/*.pyc"
+  - "!**/node_modules/**"
+  - "!venv/**"
+  - "!.venv/**"
+  - "!dist/**"
+  - "!whatsapp_bridge/**"
+  - "!scripts/**"
+
+extraResources:
+  - from: whatsapp_bridge/
+    to: whatsapp_bridge/
+    filter:
+      - "**/*"
+      - "!node_modules/**"
+
+win:
+  target: nsis
+  icon: frontend/icons/icon.ico
+
+mac:
+  target: dmg
+  icon: frontend/icons/icon.icns
+  category: public.app-category.productivity
+
+linux:
+  target: AppImage
+  icon: frontend/icons/icon.png
+
+nsis:
+  oneClick: false
+  allowToChangeInstallationDirectory: true
+  createDesktopShortcut: true
+  installerIcon: frontend/icons/icon.ico
+  uninstallerIcon: frontend/icons/icon.ico
+  license: LICENSE.txt
