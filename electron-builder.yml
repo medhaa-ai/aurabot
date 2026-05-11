@@ -33,7 +33,7 @@ win:
 
 mac:
   target: dmg
-  icon: frontend/icons/icon.icns
+  icon: frontend/icons/icon.png
   category: public.app-category.productivity
 
 linux:

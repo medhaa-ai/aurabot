@@ -1,8 +1,9 @@
 """Generate AuraBot app icons using Pillow.
 
 Creates:
-  frontend/icons/icon.png   — 512x512 master
+  frontend/icons/icon.png   — 512x512 master (also used as macOS source)
   frontend/icons/icon.ico   — Windows multi-size (16,24,32,48,64,128,256)
+  frontend/icons/icon.icns  — macOS (generated only on macOS via iconutil)
   frontend/icons/tray.png   — 32x32 system-tray icon
 
 Usage:
@@ -93,24 +94,50 @@ def _draw_tray(size: int = 32) -> Image.Image:
     return img
 
 
+def _make_icns(master_png: Path, out: Path) -> None:
+    """Generate icon.icns on macOS using iconutil (requires macOS)."""
+    import subprocess, tempfile, shutil
+    iconset = Path(tempfile.mkdtemp()) / "icon.iconset"
+    iconset.mkdir()
+    sizes = [16, 32, 64, 128, 256, 512, 1024]
+    for s in sizes:
+        img = Image.open(master_png).resize((s, s), Image.LANCZOS)
+        img.save(iconset / f"icon_{s}x{s}.png")
+        if s <= 512:
+            img2x = Image.open(master_png).resize((s * 2, s * 2), Image.LANCZOS)
+            img2x.save(iconset / f"icon_{s}x{s}@2x.png")
+    subprocess.run(["iconutil", "-c", "icns", str(iconset), "-o", str(out)], check=True)
+    shutil.rmtree(iconset.parent)
+
+
 def main():
     print("Generating AuraBot icons...")
 
     # Master PNG (512)
     master = _draw_icon(512)
-    master.save(ICON_DIR / "icon.png", "PNG")
-    print(f"  icon.png ({ICON_DIR / 'icon.png'})")
+    master_path = ICON_DIR / "icon.png"
+    master.save(master_path, "PNG")
+    print(f"  icon.png ({master_path})")
 
-    # Windows ICO — multiple sizes embedded
-    ico_sizes = [16, 24, 32, 48, 64, 128, 256]
-    frames    = [_draw_icon(sz).convert("RGBA") for sz in ico_sizes]
-    frames[0].save(
+    # Windows ICO — draw at 256 then let Pillow downsample to each required size
+    ico_base  = _draw_icon(256).convert("RGBA")
+    ico_sizes = [(16,16), (24,24), (32,32), (48,48), (64,64), (128,128), (256,256)]
+    ico_base.save(
         ICON_DIR / "icon.ico",
         format="ICO",
-        sizes=[(sz, sz) for sz in ico_sizes],
-        append_images=frames[1:],
+        sizes=ico_sizes,
     )
     print(f"  icon.ico  ({ICON_DIR / 'icon.ico'})")
+
+    # macOS ICNS (macOS only — requires iconutil)
+    if sys.platform == "darwin":
+        try:
+            _make_icns(master_path, ICON_DIR / "icon.icns")
+            print(f"  icon.icns ({ICON_DIR / 'icon.icns'})")
+        except Exception as e:
+            print(f"  icon.icns skipped: {e}")
+    else:
+        print("  icon.icns skipped (run on macOS to generate)")
 
     # Tray PNG
     tray = _draw_tray(32)
