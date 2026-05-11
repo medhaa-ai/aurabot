@@ -82,9 +82,14 @@ async function spawnPythonBackend() {
     ? path.join(process.resourcesPath, 'app')
     : path.join(__dirname, '..');
 
+  // Pass the exact bridge directory so whatsapp.py doesn't have to guess
+  const bridgeDir = app.isPackaged
+    ? path.join(process.resourcesPath, 'whatsapp_bridge')
+    : path.join(__dirname, '..', 'whatsapp_bridge');
+
   pythonProcess = spawn(python, [script], {
     stdio: ['ignore', logFd, logFd],
-    env:         { ...process.env, PYTHONPATH: projectRoot },
+    env:         { ...process.env, PYTHONPATH: projectRoot, AURABOT_BRIDGE_DIR: bridgeDir },
     detached:    false,
     windowsHide: true,
   });

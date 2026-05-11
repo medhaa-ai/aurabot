@@ -24,13 +24,11 @@ BRIDGE_PORT = 8766
 BRIDGE_URL  = f"http://127.0.0.1:{BRIDGE_PORT}"
 
 def _find_bridge_dir() -> Path:
-    # In packaged app (electron-builder extraResources), bridge lands at
-    # resources/whatsapp_bridge — one level above resources/app/
-    app_dir = Path(__file__).resolve().parent.parent.parent
-    pkg_path = app_dir.parent / "whatsapp_bridge"
-    if pkg_path.exists():
-        return pkg_path
-    return app_dir / "whatsapp_bridge"  # dev layout
+    # Electron sets this env var to the exact path — always trust it if present
+    if os.environ.get("AURABOT_BRIDGE_DIR"):
+        return Path(os.environ["AURABOT_BRIDGE_DIR"])
+    # Dev fallback: three levels up from this file is the project root
+    return Path(__file__).resolve().parent.parent.parent / "whatsapp_bridge"
 
 BRIDGE_DIR = _find_bridge_dir()
 
