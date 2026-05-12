@@ -20,4 +20,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
 
   // Open a URL in the system default browser (used for OAuth flows)
   openExternal: (url) => ipcRenderer.invoke('open-external', url),
+
+  // OS-level toast notification
+  showNotification: (title, body, urgency) =>
+    ipcRenderer.send('show-notification', { title, body, urgency }),
 });

@@ -25,6 +25,11 @@ def _run() -> None:
             check_daily_nudges()
         except Exception as exc:
             log.debug("Scheduler daily nudge error: %s", exc)
+        try:
+            from backend.nudges.whatsapp_nudge import check_whatsapp_nudges
+            check_whatsapp_nudges()
+        except Exception as exc:
+            log.debug("Scheduler WhatsApp nudge error: %s", exc)
         time.sleep(30)
 
 

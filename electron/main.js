@@ -1,4 +1,4 @@
-const { app, BrowserWindow, ipcMain, screen, Tray, Menu, nativeImage, shell } = require('electron');
+const { app, BrowserWindow, ipcMain, screen, Tray, Menu, nativeImage, shell, Notification } = require('electron');
 const path = require('path');
 const fs = require('fs');
 const os = require('os');
@@ -240,4 +240,30 @@ ipcMain.handle('get-window-always-on-top', () => mainWindow?.isAlwaysOnTop() ?? 
 ipcMain.handle('open-external', (_event, url) => {
   // Only allow http/https URLs to prevent abuse
   if (/^https?:\/\//.test(url)) shell.openExternal(url);
+});
+
+ipcMain.on('show-notification', (_event, { title, body, urgency }) => {
+  if (!Notification.isSupported()) return;
+  const n = new Notification({
+    title:  title || 'AuraBot',
+    body:   body  || '',
+    silent: urgency !== 'high',
+    urgency: urgency === 'high' ? 'critical' : 'normal',
+  });
+  n.on('click', () => {
+    if (mainWindow) {
+      // Expand from compact if needed before showing
+      if (isCompact) {
+        const bounds = mainWindow.getBounds();
+        mainWindow.setMinimumSize(320, 500);
+        mainWindow.setResizable(true);
+        mainWindow.setBounds({ x: bounds.x, y: bounds.y, width: bounds.width, height: expandedHeight });
+        isCompact = false;
+        mainWindow.webContents.send('compact-changed', false);
+      }
+      mainWindow.show();
+      mainWindow.focus();
+    }
+  });
+  n.show();
 });
