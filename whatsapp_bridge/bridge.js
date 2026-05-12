@@ -213,6 +213,44 @@ const server = http.createServer(async (req, res) => {
     }
   }
 
+  // ── GET /wa/recent ─────────────────────────────────────────────────────
+  // Returns top N chats (default 25) with their last M messages each.
+  // ?chats=N&messages=M
+  if (urlPath === '/wa/recent') {
+    if (!connected || !client) return json(res, 503, { error: 'Not connected' });
+    try {
+      const chatLimit = Math.min(parseInt(qs.chats    || '25', 10), 100);
+      const msgLimit  = Math.min(parseInt(qs.messages || '15', 10), 50);
+      const allChats  = await client.getChats();
+      const slice     = allChats.slice(0, chatLimit);
+
+      const results = await Promise.all(slice.map(async c => {
+        let messages = [];
+        try {
+          const msgs = await c.fetchMessages({ limit: msgLimit });
+          messages = msgs.map(m => ({
+            body:      (m.body || '').slice(0, 500),
+            fromMe:    m.fromMe,
+            timestamp: m.timestamp,
+            type:      m.type,
+          }));
+        } catch (_) {}
+        return {
+          id:          c.id._serialized,
+          name:        c.name || c.id.user,
+          unreadCount: c.unreadCount || 0,
+          timestamp:   c.timestamp   || 0,
+          isGroup:     c.isGroup     || false,
+          messages,
+        };
+      }));
+
+      return json(res, 200, results);
+    } catch (e) {
+      return json(res, 500, { error: e.message });
+    }
+  }
+
   // ── GET /wa/messages ───────────────────────────────────────────────────
   if (urlPath === '/wa/messages') {
     if (!connected || !client) return json(res, 503, { error: 'Not connected' });

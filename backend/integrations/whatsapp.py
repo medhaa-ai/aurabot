@@ -162,6 +162,23 @@ def get_chats(limit: int = 100) -> list:
         return []
 
 
+def get_recent_chats_with_messages(chat_limit: int = 25, msg_limit: int = 15) -> list:
+    """
+    Return the most recent `chat_limit` chats, each with their last
+    `msg_limit` messages. Covers both read and unread conversations.
+    """
+    if not _bridge_alive():
+        return []
+    try:
+        return _proxy_get(
+            f"/wa/recent?chats={chat_limit}&messages={msg_limit}",
+            timeout=30,
+        )
+    except Exception as exc:
+        log.warning("WhatsApp recent chats error: %s", exc)
+        return []
+
+
 def get_unread_chats() -> list:
     """
     Return all chats with unread messages, scanning the full chat list.
@@ -235,6 +252,23 @@ def format_unread_for_claude(chats: list) -> str:
     return "\n".join(lines).strip()
 
 
+def _fmt_messages(chat_name: str, messages: list) -> list:
+    """Render a message list as indented lines."""
+    from datetime import datetime
+    lines = []
+    for m in messages:
+        if not m.get("body") or m.get("type") not in (None, "chat", ""):
+            continue
+        ts = m.get("timestamp", 0)
+        try:
+            t = datetime.fromtimestamp(ts).strftime("%d %b %H:%M") if ts else ""
+        except Exception:
+            t = ""
+        prefix = "   You" if m.get("fromMe") else f"   {chat_name.split()[0]}"
+        lines.append(f"{prefix} [{t}]: {m['body'][:400]}")
+    return lines
+
+
 async def execute_whatsapp_check(_input: dict) -> str:
     """Tool executor called from claude_client when Claude uses check_whatsapp."""
     status = get_status()
@@ -249,15 +283,22 @@ async def execute_whatsapp_check(_input: dict) -> str:
             "WhatsApp bridge is running but the phone has not scanned the QR code yet. "
             "Please scan the QR code shown in Settings -> API Keys."
         )
-    # Prefer unread view (rich context); fall back to full chat list
-    unread = get_unread_chats()
-    if unread:
-        summary = format_unread_for_claude(unread)
-        # Also append a brief overview of recent chats for full context
-        recent = get_chats(limit=30)
-        if recent:
-            summary += "\n\n" + format_chats_for_claude(recent)
-        return summary
-    # No unread — show recent chats
-    chats = get_chats(limit=50)
-    return format_chats_for_claude(chats)
+
+    # Fetch last 25 chats with full message history (read + unread)
+    recent = get_recent_chats_with_messages(chat_limit=25, msg_limit=15)
+    if not recent:
+        return "No WhatsApp chats found."
+
+    from datetime import datetime
+    lines = [f"WhatsApp — last {len(recent)} conversations:\n"]
+    for i, c in enumerate(recent, 1):
+        name      = c.get("name", "Unknown")
+        unread    = c.get("unreadCount", 0)
+        group_tag = " (group)" if c.get("isGroup") else ""
+        unread_str = f"  *** {unread} UNREAD ***" if unread else ""
+        lines.append(f"{i}. {name}{group_tag}{unread_str}")
+        msg_lines = _fmt_messages(name, c.get("messages", []))
+        lines.extend(msg_lines if msg_lines else ["   (no text messages)"])
+        lines.append("")
+
+    return "\n".join(lines).strip()
