@@ -89,7 +89,8 @@ const SettingsPanel = (() => {
     const overlay = document.getElementById('settings-overlay');
     overlay.removeAttribute('hidden');
     refreshKeyStatus();
-    _startWaHeartbeat();   // keep WA status live while panel is open
+    refreshWaStatus();     // immediate refresh so status is never stale on open
+    _startWaHeartbeat();   // keep refreshing every 5 s while panel is open
   }
 
   function close() {

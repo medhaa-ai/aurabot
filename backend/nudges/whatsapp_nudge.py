@@ -40,8 +40,17 @@ def check_whatsapp_nudges() -> None:
         _last_fired      = time.time()
         _last_unread_ids = current_ids
 
-        total   = sum(c.get("unreadCount", 0) for c in unread)
-        names   = [c.get("name", "Unknown") for c in unread[:3]]
+        total = sum(c.get("unreadCount", 0) for c in unread)
+
+        def _display_name(c: dict) -> str:
+            name = c.get("name", "")
+            # If name looks like a raw phone number, abbreviate it
+            digits = name.replace("+", "").replace(" ", "").replace("-", "")
+            if digits.isdigit() and len(digits) >= 8:
+                return name[:7] + "…"
+            return name or "Unknown"
+
+        names   = [_display_name(c) for c in unread[:3]]
         summary = ", ".join(names)
         if len(unread) > 3:
             summary += f" +{len(unread) - 3} more"
