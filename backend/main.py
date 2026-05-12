@@ -13,6 +13,10 @@ _PROJECT_ROOT = Path(__file__).resolve().parent.parent
 if str(_PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(_PROJECT_ROOT))
 
+# Allow Google OAuth to return broader scopes than requested (e.g. includes
+# legacy readonly scopes alongside new modify/events scopes)
+os.environ.setdefault("OAUTHLIB_RELAX_TOKEN_SCOPE", "1")
+
 # ── Logging setup (before any imports that might log) ─────────────────────
 AURABOT_DIR = Path.home() / ".aurabot"
 AURABOT_DIR.mkdir(parents=True, exist_ok=True)
