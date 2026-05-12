@@ -58,6 +58,7 @@ TOOLS:
 - web_search: Use proactively for current events, news, prices, or anything outdated. Always cite the source URL.
 - check_email / get_priority_email: Read inbox or priority emails. After showing emails, offer to mark as read, star, or archive them.
 - label_email: Mark emails read, star, archive, or flag as important. Use after check_email when the user wants to act on a message.
+- check_whatsapp: Read WhatsApp conversations (read AND unread). Fetches the last 25 chats with full message history. Use for any question about WhatsApp messages, contacts, or conversations.
 - check_calendar: Read upcoming events.
 - create_calendar_event: Schedule meetings or events on Google Calendar. Confirm title, date/time, and duration with the user before creating. Default meeting duration is 1 hour unless specified.
 - set_reminder: Set an in-app reminder nudge (does NOT create a calendar event — use create_calendar_event for that).
@@ -141,18 +142,15 @@ CHECK_CALENDAR_TOOL = {
 CHECK_WHATSAPP_TOOL = {
     "name": "check_whatsapp",
     "description": (
-        "Read the user's recent WhatsApp conversations. Use when the user asks about "
-        "WhatsApp messages, chats, or anything WhatsApp-related. Returns recent chats "
-        "with names, unread counts, and last message previews."
+        "Read the user's WhatsApp conversations — both read and unread. "
+        "Returns the last 25 chats with full message history (last 15 messages each), "
+        "including sender names, timestamps, and message bodies. "
+        "Use whenever the user asks about any WhatsApp message, chat, contact, or conversation — "
+        "even ones they've already read."
     ),
     "input_schema": {
         "type": "object",
-        "properties": {
-            "filter": {
-                "type": "string",
-                "description": "Optional: 'unread' to focus on unread chats, or leave empty for all recent.",
-            }
-        },
+        "properties": {},
         "required": [],
     },
 }
