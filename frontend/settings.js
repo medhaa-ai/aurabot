@@ -55,13 +55,9 @@ const SettingsPanel = (() => {
 
     // Pin button handled in app.js initWindowControls
 
-    // Gmail buttons (Phase 5)
+    // Gmail + Calendar share one OAuth flow
     document.getElementById('btn-connect-gmail')?.addEventListener('click', connectGmail);
     document.getElementById('btn-disconnect-gmail')?.addEventListener('click', disconnectGmail);
-
-    // Calendar buttons (Phase 7)
-    document.getElementById('btn-connect-cal')?.addEventListener('click', connectCalendar);
-    document.getElementById('btn-disconnect-cal')?.addEventListener('click', disconnectCalendar);
 
     // WhatsApp buttons (Phase 6)
     document.getElementById('btn-start-wa')?.addEventListener('click', startWhatsApp);
@@ -342,7 +338,8 @@ const SettingsPanel = (() => {
         const status = await _get('/gmail/status');
         if (status.connected) {
           _applyGmailStatus(status);
-          showToast('Gmail connected!');
+          refreshCalendarStatus();
+          showToast('Google connected — Gmail & Calendar ready!');
           return;
         }
       } catch (_) {}
@@ -360,11 +357,12 @@ const SettingsPanel = (() => {
   }
 
   async function disconnectGmail() {
-    if (!confirm('Disconnect Gmail? AuraBot will lose access to your inbox.')) return;
+    if (!confirm('Disconnect Google? AuraBot will lose access to Gmail and Calendar.')) return;
     try {
       await _post('/gmail/disconnect', {});
       _applyGmailStatus({ connected: false, email: null });
-      showToast('Gmail disconnected.');
+      _applyCalendarStatus({ connected: false });
+      showToast('Google disconnected.');
     } catch (_) {
       showToast('Disconnect failed — please try again.');
     }

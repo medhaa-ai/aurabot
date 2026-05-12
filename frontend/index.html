@@ -135,7 +135,7 @@
               Add <code>http://localhost:8765/gmail/callback</code> as an authorised redirect URI.
             </p>
             <div class="gmail-btn-row">
-              <button class="btn-primary btn-sm" id="btn-connect-gmail">Connect Gmail</button>
+              <button class="btn-primary btn-sm" id="btn-connect-gmail">Connect Google (Gmail + Calendar)</button>
               <button class="btn-danger btn-sm" id="btn-disconnect-gmail" hidden>Disconnect</button>
             </div>
             <p id="gmail-email-label" class="gmail-email-label" hidden></p>
@@ -149,13 +149,8 @@
               <span id="cal-status-badge" class="gmail-badge gmail-badge-off">Not connected</span>
             </div>
             <p class="field-note">
-              Uses the same Google credentials above. Connecting re-authorises with both Gmail + Calendar scopes.
+              Connects automatically when you connect Google above — no separate step needed.
             </p>
-            <div class="gmail-btn-row">
-              <button class="btn-primary btn-sm" id="btn-connect-cal">Connect Calendar</button>
-              <button class="btn-danger btn-sm" id="btn-disconnect-cal" hidden>Disconnect Calendar</button>
-            </div>
-            <p id="cal-poll-label" class="gmail-poll-label" hidden>Waiting for browser authorisation…</p>
           </div>
 
           <div class="wa-connect-section">

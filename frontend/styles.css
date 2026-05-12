@@ -813,6 +813,7 @@ html, body { width: 100%; height: 100%; overflow: hidden; font-family: var(--fon
   margin: 0;
   animation: tool-pulse 1.4s ease-in-out infinite;
 }
+.wa-qr-wrap[hidden] { display: none !important; }
 .wa-qr-wrap {
   display: flex;
   flex-direction: column;
