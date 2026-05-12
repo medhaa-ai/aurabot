@@ -151,18 +151,63 @@ const server = http.createServer(async (req, res) => {
   }
 
   // ── GET /wa/chats ──────────────────────────────────────────────────────
+  // ?limit=N (default 100). Returns all chats sorted by most recent first.
   if (urlPath === '/wa/chats') {
     if (!connected || !client) return json(res, 503, { error: 'Not connected' });
     try {
+      const limit = Math.min(parseInt(qs.limit || '100', 10), 500);
       const chats = await client.getChats();
-      return json(res, 200, chats.slice(0, 20).map(c => ({
+      return json(res, 200, chats.slice(0, limit).map(c => ({
         id:          c.id._serialized,
         name:        c.name || c.id.user,
         unreadCount: c.unreadCount || 0,
-        lastMessage: c.lastMessage?.body?.slice(0, 120) || '',
+        lastMessage: c.lastMessage?.body?.slice(0, 200) || '',
         timestamp:   c.timestamp || 0,
         isGroup:     c.isGroup || false,
       })));
+    } catch (e) {
+      return json(res, 500, { error: e.message });
+    }
+  }
+
+  // ── GET /wa/unread ─────────────────────────────────────────────────────
+  // Scans ALL chats, returns only those with unread > 0.
+  // Each entry includes recent unread message bodies for context.
+  if (urlPath === '/wa/unread') {
+    if (!connected || !client) return json(res, 503, { error: 'Not connected' });
+    try {
+      const allChats = await client.getChats();
+      const unread   = allChats.filter(c => (c.unreadCount || 0) > 0);
+
+      const results = await Promise.all(unread.map(async c => {
+        let recentMsgs = [];
+        try {
+          // Fetch enough messages to cover all unread + a couple for context
+          const fetchCount = Math.max(c.unreadCount + 3, 8);
+          const msgs = await c.fetchMessages({ limit: fetchCount });
+          // Only return the actual unread tail (fromMe:false is a heuristic; keep all)
+          recentMsgs = msgs.slice(-Math.min(fetchCount, msgs.length)).map(m => ({
+            body:      (m.body || '').slice(0, 300),
+            fromMe:    m.fromMe,
+            timestamp: m.timestamp,
+            type:      m.type,
+          }));
+        } catch (_) { /* non-critical */ }
+
+        return {
+          id:          c.id._serialized,
+          name:        c.name || c.id.user,
+          unreadCount: c.unreadCount || 0,
+          lastMessage: c.lastMessage?.body?.slice(0, 300) || '',
+          timestamp:   c.timestamp || 0,
+          isGroup:     c.isGroup || false,
+          messages:    recentMsgs,
+        };
+      }));
+
+      // Sort by most recent first
+      results.sort((a, b) => b.timestamp - a.timestamp);
+      return json(res, 200, results);
     } catch (e) {
       return json(res, 500, { error: e.message });
     }
@@ -172,7 +217,7 @@ const server = http.createServer(async (req, res) => {
   if (urlPath === '/wa/messages') {
     if (!connected || !client) return json(res, 503, { error: 'Not connected' });
     const chatId = qs.chatId;
-    const limit  = Math.min(parseInt(qs.limit || '20', 10), 50);
+    const limit  = Math.min(parseInt(qs.limit || '30', 10), 100);
     if (!chatId) return json(res, 400, { error: 'chatId required' });
     try {
       const chat = await client.getChatById(chatId);

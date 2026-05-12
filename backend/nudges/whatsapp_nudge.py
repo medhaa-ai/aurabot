@@ -21,13 +21,12 @@ def check_whatsapp_nudges() -> None:
         return
 
     try:
-        from backend.integrations.whatsapp import get_status, get_chats
+        from backend.integrations.whatsapp import get_status, get_unread_chats
         status = get_status()
         if not status.get("bridge_running") or not status.get("connected"):
             return
 
-        chats = get_chats()
-        unread = [c for c in chats if (c.get("unreadCount") or 0) > 0]
+        unread = get_unread_chats()
         if not unread:
             _last_unread_ids = set()
             return

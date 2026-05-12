@@ -151,14 +151,28 @@ def get_qr() -> dict:
         return {"connected": False, "qr": None, "initialising": False}
 
 
-def get_chats() -> list:
-    """Return up to 20 most recent chats."""
+def get_chats(limit: int = 100) -> list:
+    """Return up to `limit` most recent chats (default 100)."""
     if not _bridge_alive():
         return []
     try:
-        return _proxy_get("/wa/chats")
+        return _proxy_get(f"/wa/chats?limit={limit}")
     except Exception as exc:
         log.warning("WhatsApp chats error: %s", exc)
+        return []
+
+
+def get_unread_chats() -> list:
+    """
+    Return all chats with unread messages, scanning the full chat list.
+    Each chat includes a `messages` list with recent message bodies for context.
+    """
+    if not _bridge_alive():
+        return []
+    try:
+        return _proxy_get("/wa/unread", timeout=20)
+    except Exception as exc:
+        log.warning("WhatsApp unread chats error: %s", exc)
         return []
 
 
@@ -175,14 +189,47 @@ def format_chats_for_claude(chats: list) -> str:
 
     lines = [f"Recent WhatsApp chats ({len(chats)} shown):\n"]
     for i, c in enumerate(chats, 1):
-        name      = c.get("name", "Unknown")
-        unread    = c.get("unreadCount", 0)
-        preview   = (c.get("lastMessage") or "")[:120]
-        group_tag = " (group)" if c.get("isGroup") else ""
+        name       = c.get("name", "Unknown")
+        unread     = c.get("unreadCount", 0)
+        preview    = (c.get("lastMessage") or "")[:200]
+        group_tag  = " (group)" if c.get("isGroup") else ""
         unread_str = f" [{unread} unread]" if unread else ""
         lines.append(f"{i}. {name}{group_tag}{unread_str}")
         if preview:
             lines.append(f"   Last: {preview}")
+        lines.append("")
+
+    return "\n".join(lines).strip()
+
+
+def format_unread_for_claude(chats: list) -> str:
+    """Format unread chats with message context for Claude."""
+    if not chats:
+        return "No unread WhatsApp messages."
+
+    from datetime import datetime
+    lines = [f"Unread WhatsApp messages ({len(chats)} conversation{'s' if len(chats) != 1 else ''}):\n"]
+    for i, c in enumerate(chats, 1):
+        name      = c.get("name", "Unknown")
+        unread    = c.get("unreadCount", 0)
+        group_tag = " (group)" if c.get("isGroup") else ""
+        lines.append(f"{i}. {name}{group_tag} — {unread} unread")
+
+        messages = c.get("messages", [])
+        if messages:
+            for m in messages:
+                if not m.get("body") or m.get("type") not in (None, "chat", ""):
+                    continue
+                ts = m.get("timestamp", 0)
+                try:
+                    t = datetime.fromtimestamp(ts).strftime("%H:%M") if ts else ""
+                except Exception:
+                    t = ""
+                prefix = "   You:" if m.get("fromMe") else f"   {name.split()[0]}:"
+                lines.append(f"{prefix} [{t}] {m['body'][:250]}")
+        elif c.get("lastMessage"):
+            lines.append(f"   Last: {c['lastMessage'][:200]}")
+
         lines.append("")
 
     return "\n".join(lines).strip()
@@ -202,5 +249,15 @@ async def execute_whatsapp_check(_input: dict) -> str:
             "WhatsApp bridge is running but the phone has not scanned the QR code yet. "
             "Please scan the QR code shown in Settings -> API Keys."
         )
-    chats = get_chats()
+    # Prefer unread view (rich context); fall back to full chat list
+    unread = get_unread_chats()
+    if unread:
+        summary = format_unread_for_claude(unread)
+        # Also append a brief overview of recent chats for full context
+        recent = get_chats(limit=30)
+        if recent:
+            summary += "\n\n" + format_chats_for_claude(recent)
+        return summary
+    # No unread — show recent chats
+    chats = get_chats(limit=50)
     return format_chats_for_claude(chats)
