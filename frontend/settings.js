@@ -89,10 +89,12 @@ const SettingsPanel = (() => {
     const overlay = document.getElementById('settings-overlay');
     overlay.removeAttribute('hidden');
     refreshKeyStatus();
+    _startWaHeartbeat();   // keep WA status live while panel is open
   }
 
   function close() {
     document.getElementById('settings-overlay').hidden = true;
+    _stopWaHeartbeat();    // no need to poll when panel is closed
   }
 
   // ── Backend helpers ────────────────────────────────────────────────────
@@ -538,18 +540,34 @@ const SettingsPanel = (() => {
       attempts++;
       try {
         const status = await _get('/whatsapp/status');
-        _applyWaStatus(status);
+        _applyWaStatus(status);   // always updates UI; stops poll if connected
         if (status.connected) {
           showToast('WhatsApp connected!');
           return;
         }
         if (status.bridge_running) await _updateWaQr();
       } catch (_) {}
-      if (attempts >= 120) {  // stop after ~6 minutes
+      if (attempts >= 200) {    // ~10 min — long enough for slow session restore
         _stopWaPoll();
         showToast('WhatsApp scan timed out. Please try again.');
       }
     }, 3000);
+  }
+
+  // Lightweight background heartbeat — refreshes WA status every 5 s while
+  // Settings is open, so the UI picks up a connected bridge automatically.
+  let _waHeartbeatTimer = null;
+  function _startWaHeartbeat() {
+    if (_waHeartbeatTimer) return;
+    _waHeartbeatTimer = setInterval(async () => {
+      try {
+        const status = await _get('/whatsapp/status');
+        _applyWaStatus(status);
+      } catch (_) {}
+    }, 5000);
+  }
+  function _stopWaHeartbeat() {
+    if (_waHeartbeatTimer) { clearInterval(_waHeartbeatTimer); _waHeartbeatTimer = null; }
   }
 
   function _stopWaPoll() {

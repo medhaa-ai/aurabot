@@ -23,29 +23,35 @@ log = logging.getLogger(__name__)
 BRIDGE_PORT = 8766
 BRIDGE_URL  = f"http://127.0.0.1:{BRIDGE_PORT}"
 
-def _find_bridge_dir() -> Path:
-    # 1. Electron sets this env var explicitly — trust it first
+_bridge_dir_cache: "Path | None" = None
+
+
+def _get_bridge_dir() -> Path:
+    """Resolve the bridge directory lazily (called at runtime, not import time)."""
+    global _bridge_dir_cache
+    if _bridge_dir_cache is not None:
+        return _bridge_dir_cache
+
+    # 1. Electron passes the exact path via env var — always trust it
     env_dir = os.environ.get("AURABOT_BRIDGE_DIR", "").strip()
     if env_dir:
-        p = Path(env_dir)
-        log.info("WhatsApp bridge dir from env: %s", p)
-        return p
+        _bridge_dir_cache = Path(env_dir)
+        log.info("WhatsApp bridge dir (env): %s", _bridge_dir_cache)
+        return _bridge_dir_cache
 
     here = Path(__file__).resolve()
-    # 2. Packaged layout: .../resources/app/backend/integrations/whatsapp.py
-    #    → go 4 levels up to reach resources/, then down to whatsapp_bridge/
+    # 2. Packaged: resources/app/backend/integrations/whatsapp.py → 4 up = resources/
     packaged = here.parent.parent.parent.parent / "whatsapp_bridge"
     if packaged.exists():
-        log.info("WhatsApp bridge dir (packaged fallback): %s", packaged)
-        return packaged
+        _bridge_dir_cache = packaged
+        log.info("WhatsApp bridge dir (packaged): %s", _bridge_dir_cache)
+        return _bridge_dir_cache
 
-    # 3. Dev layout: project_root/backend/integrations/whatsapp.py
-    #    → 3 levels up is project root
-    dev = here.parent.parent.parent / "whatsapp_bridge"
-    log.info("WhatsApp bridge dir (dev fallback): %s", dev)
-    return dev
+    # 3. Dev: project_root/backend/integrations/whatsapp.py → 3 up = project_root/
+    _bridge_dir_cache = here.parent.parent.parent / "whatsapp_bridge"
+    log.info("WhatsApp bridge dir (dev): %s", _bridge_dir_cache)
+    return _bridge_dir_cache
 
-BRIDGE_DIR = _find_bridge_dir()
 
 _bridge_proc: "subprocess.Popen | None" = None
 
@@ -63,15 +69,16 @@ def _bridge_alive() -> bool:
 def start_bridge() -> dict:
     """Start the Node.js bridge if not already running. Returns {started, message}."""
     global _bridge_proc
+    bridge_dir = _get_bridge_dir()
 
     if _bridge_alive():
         return {"started": False, "message": "Bridge already running"}
 
-    bridge_script = BRIDGE_DIR / "bridge.js"
+    bridge_script = bridge_dir / "bridge.js"
     if not bridge_script.exists():
         return {"started": False, "message": f"Bridge script not found: {bridge_script}"}
 
-    if not (BRIDGE_DIR / "node_modules").exists():
+    if not (bridge_dir / "node_modules").exists():
         return {
             "started": False,
             "message": "Run 'npm install' in the whatsapp_bridge/ folder first.",
@@ -80,7 +87,7 @@ def start_bridge() -> dict:
     try:
         _bridge_proc = subprocess.Popen(
             ["node", str(bridge_script)],
-            cwd=str(BRIDGE_DIR),
+            cwd=str(bridge_dir),
             env={**os.environ},
             stdout=subprocess.PIPE,
             stderr=subprocess.STDOUT,
