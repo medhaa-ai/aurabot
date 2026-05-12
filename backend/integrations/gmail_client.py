@@ -18,8 +18,8 @@ import logging
 log = logging.getLogger(__name__)
 
 SCOPES       = [
-    "https://www.googleapis.com/auth/gmail.readonly",
-    "https://www.googleapis.com/auth/calendar.readonly",
+    "https://www.googleapis.com/auth/gmail.modify",        # read + label + archive
+    "https://www.googleapis.com/auth/calendar.events",     # create / edit events
 ]
 REDIRECT_URI = "http://localhost:8765/gmail/callback"
 
@@ -184,6 +184,99 @@ def fetch_unread(max_messages: int = 10) -> list:
     except Exception as exc:
         log.error("Gmail fetch error: %s", exc)
         return []
+
+
+def fetch_priority(max_messages: int = 10) -> list:
+    """Fetch important/starred emails from the priority inbox."""
+    creds = _get_credentials()
+    if creds is None:
+        return []
+    try:
+        from googleapiclient.discovery import build
+        svc = build("gmail", "v1", credentials=creds, cache_discovery=False)
+        results = svc.users().messages().list(
+            userId="me",
+            labelIds=["IMPORTANT", "INBOX"],
+            maxResults=max_messages,
+        ).execute()
+        messages = results.get("messages", [])
+        emails = []
+        for msg in messages:
+            detail  = svc.users().messages().get(
+                userId="me", id=msg["id"], format="metadata",
+                metadataHeaders=["From", "Subject", "Date"],
+            ).execute()
+            headers = {h["name"]: h["value"] for h in detail.get("payload", {}).get("headers", [])}
+            labels  = detail.get("labelIds", [])
+            emails.append({
+                "id":      msg["id"],
+                "subject": headers.get("Subject", "(No subject)"),
+                "sender":  headers.get("From",    "Unknown"),
+                "snippet": detail.get("snippet",  ""),
+                "date":    headers.get("Date",     ""),
+                "starred": "STARRED" in labels,
+                "unread":  "UNREAD"  in labels,
+            })
+        return emails
+    except Exception as exc:
+        log.error("Priority email fetch error: %s", exc)
+        return []
+
+
+def mark_as_read(message_id: str) -> bool:
+    """Remove UNREAD label from a message."""
+    creds = _get_credentials()
+    if creds is None:
+        return False
+    try:
+        from googleapiclient.discovery import build
+        svc = build("gmail", "v1", credentials=creds, cache_discovery=False)
+        svc.users().messages().modify(
+            userId="me", id=message_id,
+            body={"removeLabelIds": ["UNREAD"]},
+        ).execute()
+        return True
+    except Exception as exc:
+        log.error("Mark as read error: %s", exc)
+        return False
+
+
+def apply_label(message_id: str, action: str, label_name: str = "") -> dict:
+    """
+    Apply an action to a message.
+    action: 'mark_read' | 'star' | 'unstar' | 'archive' | 'important' | 'not_important'
+    """
+    creds = _get_credentials()
+    if creds is None:
+        return {"ok": False, "error": "Not connected"}
+    try:
+        from googleapiclient.discovery import build
+        svc = build("gmail", "v1", credentials=creds, cache_discovery=False)
+        add_labels, remove_labels = [], []
+
+        if action == "mark_read":
+            remove_labels = ["UNREAD"]
+        elif action == "star":
+            add_labels = ["STARRED"]
+        elif action == "unstar":
+            remove_labels = ["STARRED"]
+        elif action == "archive":
+            remove_labels = ["INBOX"]
+        elif action == "important":
+            add_labels = ["IMPORTANT"]
+        elif action == "not_important":
+            remove_labels = ["IMPORTANT"]
+        else:
+            return {"ok": False, "error": f"Unknown action: {action}"}
+
+        svc.users().messages().modify(
+            userId="me", id=message_id,
+            body={"addLabelIds": add_labels, "removeLabelIds": remove_labels},
+        ).execute()
+        return {"ok": True}
+    except Exception as exc:
+        log.error("Apply label error: %s", exc)
+        return {"ok": False, "error": str(exc)}
 
 
 def format_emails_for_claude(emails: list) -> str:

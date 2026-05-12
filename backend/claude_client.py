@@ -55,7 +55,12 @@ CURRENT CONTEXT:
 - Working hours: {work_start}-{work_end} IST
 
 TOOLS:
-- You have access to web_search. Use it proactively for current events, news, prices, or anything that may be outdated in your training data. Always cite the source URL when using search results.
+- web_search: Use proactively for current events, news, prices, or anything outdated. Always cite the source URL.
+- check_email / get_priority_email: Read inbox or priority emails. After showing emails, offer to mark as read, star, or archive them.
+- label_email: Mark emails read, star, archive, or flag as important. Use after check_email when the user wants to act on a message.
+- check_calendar: Read upcoming events.
+- create_calendar_event: Schedule meetings or events on Google Calendar. Confirm title, date/time, and duration with the user before creating. Default meeting duration is 1 hour unless specified.
+- set_reminder: Set an in-app reminder nudge (does NOT create a calendar event — use create_calendar_event for that).
 
 If asked to do something outside your capabilities, say so clearly and suggest what she can do instead. Be direct and respect her time."""
 
@@ -171,6 +176,83 @@ CHECK_EMAIL_TOOL = {
     },
 }
 
+GET_PRIORITY_EMAIL_TOOL = {
+    "name": "get_priority_email",
+    "description": (
+        "Fetch the user's priority/important Gmail emails. Use when the user asks "
+        "about important emails, anything urgent, starred messages, or priority inbox."
+    ),
+    "input_schema": {
+        "type": "object",
+        "properties": {
+            "max": {
+                "type": "integer",
+                "description": "Max number of priority emails to return (default 10).",
+            }
+        },
+        "required": [],
+    },
+}
+
+LABEL_EMAIL_TOOL = {
+    "name": "label_email",
+    "description": (
+        "Manage a Gmail message — mark as read, star/unstar, archive, or mark as important. "
+        "Use when the user says 'mark that as read', 'star this email', 'archive it', "
+        "'mark as important', etc. Requires the message_id from a previous check_email result."
+    ),
+    "input_schema": {
+        "type": "object",
+        "properties": {
+            "message_id": {
+                "type": "string",
+                "description": "The Gmail message ID from a previous email listing.",
+            },
+            "action": {
+                "type": "string",
+                "enum": ["mark_read", "star", "unstar", "archive", "important", "not_important"],
+                "description": "The action to perform on the message.",
+            },
+        },
+        "required": ["message_id", "action"],
+    },
+}
+
+CREATE_CALENDAR_EVENT_TOOL = {
+    "name": "create_calendar_event",
+    "description": (
+        "Create an event on the user's Google Calendar. Use when the user asks to "
+        "schedule a meeting, add an event, book a slot, or set a calendar reminder. "
+        "Always confirm the details before creating."
+    ),
+    "input_schema": {
+        "type": "object",
+        "properties": {
+            "summary": {
+                "type": "string",
+                "description": "Event title / meeting name.",
+            },
+            "start": {
+                "type": "string",
+                "description": "Start datetime in ISO 8601 with timezone, e.g. '2026-05-13T10:00:00+05:30'.",
+            },
+            "end": {
+                "type": "string",
+                "description": "End datetime in ISO 8601 with timezone, e.g. '2026-05-13T11:00:00+05:30'.",
+            },
+            "description": {
+                "type": "string",
+                "description": "Optional event description or agenda.",
+            },
+            "location": {
+                "type": "string",
+                "description": "Optional location or meeting link.",
+            },
+        },
+        "required": ["summary", "start", "end"],
+    },
+}
+
 
 def _build_tools() -> list:
     """Return the tools list for this call — only includes integration tools when connected."""
@@ -179,12 +261,15 @@ def _build_tools() -> list:
         from backend.integrations.gmail import get_status as gmail_status
         if gmail_status()["connected"]:
             tools.append(CHECK_EMAIL_TOOL)
+            tools.append(GET_PRIORITY_EMAIL_TOOL)
+            tools.append(LABEL_EMAIL_TOOL)
     except Exception:
         pass
     try:
         from backend.integrations.calendar import get_status as cal_status
         if cal_status()["connected"]:
             tools.append(CHECK_CALENDAR_TOOL)
+            tools.append(CREATE_CALENDAR_EVENT_TOOL)
     except Exception:
         pass
     try:
@@ -335,11 +420,41 @@ async def stream_claude_response(message: str) -> AsyncIterator[str]:
                     result = await execute_email_check(tc["input"])
                     yield _sse({"type": "tool_done", "tool": "check_email"})
 
+                elif tool_name == "get_priority_email":
+                    yield _sse({"type": "tool_start", "tool": "get_priority_email", "query": "Reading priority inbox..."})
+                    from backend.integrations.gmail import fetch_priority, format_emails_for_claude
+                    emails = fetch_priority(tc["input"].get("max", 10))
+                    result = format_emails_for_claude(emails) if emails else "No priority emails found."
+                    yield _sse({"type": "tool_done", "tool": "get_priority_email"})
+
+                elif tool_name == "label_email":
+                    yield _sse({"type": "tool_start", "tool": "label_email", "query": "Updating email..."})
+                    from backend.integrations.gmail import apply_label
+                    r = apply_label(tc["input"]["message_id"], tc["input"]["action"])
+                    result = "Done." if r.get("ok") else f"Failed: {r.get('error')}"
+                    yield _sse({"type": "tool_done", "tool": "label_email"})
+
                 elif tool_name == "check_calendar":
                     yield _sse({"type": "tool_start", "tool": "check_calendar", "query": "Reading calendar..."})
                     from backend.integrations.calendar import execute_calendar_check
                     result = await execute_calendar_check(tc["input"])
                     yield _sse({"type": "tool_done", "tool": "check_calendar"})
+
+                elif tool_name == "create_calendar_event":
+                    yield _sse({"type": "tool_start", "tool": "create_calendar_event", "query": "Creating event..."})
+                    from backend.integrations.calendar import create_event
+                    r = create_event(
+                        summary     = tc["input"]["summary"],
+                        start       = tc["input"]["start"],
+                        end         = tc["input"]["end"],
+                        description = tc["input"].get("description", ""),
+                        location    = tc["input"].get("location", ""),
+                    )
+                    if r.get("ok"):
+                        result = f"Event created: '{r['summary']}'. View it here: {r['link']}"
+                    else:
+                        result = f"Failed to create event: {r.get('error')}"
+                    yield _sse({"type": "tool_done", "tool": "create_calendar_event"})
 
                 elif tool_name == "check_whatsapp":
                     yield _sse({"type": "tool_start", "tool": "check_whatsapp", "query": "Reading WhatsApp chats..."})

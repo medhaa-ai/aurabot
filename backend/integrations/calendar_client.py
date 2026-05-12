@@ -11,9 +11,9 @@ import logging
 
 log = logging.getLogger(__name__)
 
-CALENDAR_SCOPE  = "https://www.googleapis.com/auth/calendar.readonly"
+CALENDAR_SCOPE  = "https://www.googleapis.com/auth/calendar.events"
 COMBINED_SCOPES = [
-    "https://www.googleapis.com/auth/gmail.readonly",
+    "https://www.googleapis.com/auth/gmail.modify",
     CALENDAR_SCOPE,
 ]
 
@@ -78,6 +78,41 @@ def get_upcoming_events(max_events: int = 10) -> list:
     except Exception as exc:
         log.error("Calendar fetch error: %s", exc)
         return []
+
+
+def create_event(summary: str, start: str, end: str,
+                 description: str = "", location: str = "",
+                 timezone: str = "Asia/Kolkata") -> dict:
+    """
+    Create a Google Calendar event.
+    start/end: ISO 8601 strings e.g. '2026-05-12T15:00:00+05:30'
+    Returns {"ok": True, "event_id": ..., "link": ...} or {"ok": False, "error": ...}
+    """
+    from backend.integrations.gmail_client import _get_credentials
+    creds = _get_credentials()
+    if creds is None:
+        return {"ok": False, "error": "Google not connected"}
+    try:
+        from googleapiclient.discovery import build
+        svc   = build("calendar", "v3", credentials=creds, cache_discovery=False)
+        body  = {
+            "summary":     summary,
+            "description": description,
+            "location":    location,
+            "start":       {"dateTime": start, "timeZone": timezone},
+            "end":         {"dateTime": end,   "timeZone": timezone},
+        }
+        event = svc.events().insert(calendarId="primary", body=body).execute()
+        log.info("Calendar event created: %s", event.get("id"))
+        return {
+            "ok":       True,
+            "event_id": event.get("id", ""),
+            "link":     event.get("htmlLink", ""),
+            "summary":  event.get("summary", summary),
+        }
+    except Exception as exc:
+        log.error("Calendar create event error: %s", exc)
+        return {"ok": False, "error": str(exc)}
 
 
 def format_events_for_claude(events: list) -> str:
