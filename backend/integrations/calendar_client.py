@@ -82,10 +82,12 @@ def get_upcoming_events(max_events: int = 10) -> list:
 
 def create_event(summary: str, start: str, end: str,
                  description: str = "", location: str = "",
+                 attendees: list = None,
                  timezone: str = "Asia/Kolkata") -> dict:
     """
     Create a Google Calendar event.
     start/end: ISO 8601 strings e.g. '2026-05-12T15:00:00+05:30'
+    attendees: list of email strings e.g. ['alice@example.com']
     Returns {"ok": True, "event_id": ..., "link": ...} or {"ok": False, "error": ...}
     """
     from backend.integrations.gmail_client import _get_credentials
@@ -94,15 +96,19 @@ def create_event(summary: str, start: str, end: str,
         return {"ok": False, "error": "Google not connected"}
     try:
         from googleapiclient.discovery import build
-        svc   = build("calendar", "v3", credentials=creds, cache_discovery=False)
-        body  = {
+        svc  = build("calendar", "v3", credentials=creds, cache_discovery=False)
+        body = {
             "summary":     summary,
             "description": description,
             "location":    location,
             "start":       {"dateTime": start, "timeZone": timezone},
             "end":         {"dateTime": end,   "timeZone": timezone},
         }
-        event = svc.events().insert(calendarId="primary", body=body).execute()
+        if attendees:
+            body["attendees"] = [{"email": e.strip()} for e in attendees if e.strip()]
+        event = svc.events().insert(
+            calendarId="primary", body=body, sendUpdates="all"
+        ).execute()
         log.info("Calendar event created: %s", event.get("id"))
         return {
             "ok":       True,
@@ -113,6 +119,43 @@ def create_event(summary: str, start: str, end: str,
     except Exception as exc:
         log.error("Calendar create event error: %s", exc)
         return {"ok": False, "error": str(exc)}
+
+
+def update_event_attendees(event_id: str, attendees: list,
+                           timezone: str = "Asia/Kolkata") -> dict:
+    """Add attendees to an existing calendar event by ID."""
+    from backend.integrations.gmail_client import _get_credentials
+    creds = _get_credentials()
+    if creds is None:
+        return {"ok": False, "error": "Google not connected"}
+    try:
+        from googleapiclient.discovery import build
+        svc   = build("calendar", "v3", credentials=creds, cache_discovery=False)
+        event = svc.events().get(calendarId="primary", eventId=event_id).execute()
+        existing = [a["email"] for a in event.get("attendees", [])]
+        for email in attendees:
+            if email.strip() and email.strip() not in existing:
+                existing.append(email.strip())
+        event["attendees"] = [{"email": e} for e in existing]
+        updated = svc.events().update(
+            calendarId="primary", eventId=event_id,
+            body=event, sendUpdates="all"
+        ).execute()
+        log.info("Updated attendees for event %s", event_id)
+        return {"ok": True, "link": updated.get("htmlLink", ""), "summary": updated.get("summary", "")}
+    except Exception as exc:
+        log.error("Update event attendees error: %s", exc)
+        return {"ok": False, "error": str(exc)}
+
+
+def find_event_by_title(title: str) -> dict | None:
+    """Find the most recent upcoming event matching a title (case-insensitive)."""
+    events = get_upcoming_events(max_events=20)
+    title_lower = title.lower()
+    for e in events:
+        if title_lower in e.get("summary", "").lower():
+            return e
+    return None
 
 
 def format_events_for_claude(events: list) -> str:

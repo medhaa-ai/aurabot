@@ -248,8 +248,37 @@ CREATE_CALENDAR_EVENT_TOOL = {
                 "type": "string",
                 "description": "Optional location or meeting link.",
             },
+            "attendees": {
+                "type": "array",
+                "items": {"type": "string"},
+                "description": "Optional list of guest email addresses to invite, e.g. ['alice@example.com'].",
+            },
         },
         "required": ["summary", "start", "end"],
+    },
+}
+
+UPDATE_EVENT_ATTENDEES_TOOL = {
+    "name": "update_event_attendees",
+    "description": (
+        "Add guests to an existing Google Calendar event. Use when the user says "
+        "'add X to the meeting', 'invite Y to the event', or 'you didn't add the guest'. "
+        "Can find the event by title if no event_id is known."
+    ),
+    "input_schema": {
+        "type": "object",
+        "properties": {
+            "event_title": {
+                "type": "string",
+                "description": "Title of the existing event to update (used to look it up).",
+            },
+            "attendees": {
+                "type": "array",
+                "items": {"type": "string"},
+                "description": "List of email addresses to add as guests.",
+            },
+        },
+        "required": ["event_title", "attendees"],
     },
 }
 
@@ -270,6 +299,7 @@ def _build_tools() -> list:
         if cal_status()["connected"]:
             tools.append(CHECK_CALENDAR_TOOL)
             tools.append(CREATE_CALENDAR_EVENT_TOOL)
+            tools.append(UPDATE_EVENT_ATTENDEES_TOOL)
     except Exception:
         pass
     try:
@@ -449,12 +479,27 @@ async def stream_claude_response(message: str) -> AsyncIterator[str]:
                         end         = tc["input"]["end"],
                         description = tc["input"].get("description", ""),
                         location    = tc["input"].get("location", ""),
+                        attendees   = tc["input"].get("attendees", []),
                     )
                     if r.get("ok"):
                         result = f"Event created: '{r['summary']}'. View it here: {r['link']}"
                     else:
                         result = f"Failed to create event: {r.get('error')}"
                     yield _sse({"type": "tool_done", "tool": "create_calendar_event"})
+
+                elif tool_name == "update_event_attendees":
+                    yield _sse({"type": "tool_start", "tool": "update_event_attendees", "query": "Updating event guests..."})
+                    from backend.integrations.calendar import find_event_by_title, update_event_attendees
+                    event = find_event_by_title(tc["input"]["event_title"])
+                    if not event:
+                        result = f"Could not find an event matching '{tc['input']['event_title']}' in your upcoming calendar."
+                    else:
+                        r = update_event_attendees(event["id"], tc["input"]["attendees"])
+                        if r.get("ok"):
+                            result = f"Added guests to '{r['summary']}'. Invite sent."
+                        else:
+                            result = f"Failed to update event: {r.get('error')}"
+                    yield _sse({"type": "tool_done", "tool": "update_event_attendees"})
 
                 elif tool_name == "check_whatsapp":
                     yield _sse({"type": "tool_start", "tool": "check_whatsapp", "query": "Reading WhatsApp chats..."})
